@@ -111,9 +111,9 @@
       <div class="form-container">
         <form method="POST" action="/customer/login">
           <div class="form-floating">
-            <input type="text" class="form-control" id="phone" name="phone" placeholder="Nomor HP" required autofocus pattern="08[0-9]{8,13}">
+            <input type="text" class="form-control" id="phone" name="phone" placeholder="Masukkan ID/Tag Pelanggan" required autofocus>
             <label for="phone">
-              <i class="bi bi-phone me-2"></i>Nomor HP
+              <i class="bi bi-person-badge me-2"></i>ID/Tag Pelanggan
             </label>
           </div>
           <button type="submit" class="btn btn-primary btn-login w-100">
@@ -122,7 +122,7 @@
         </form>
 		<% if (error) { %>
 		<div class="alert alert-danger mt-3 text-center">
-			<i class="bi bi-exclamation-triangle me-2"></i><%= error %>
+			<i class="bi bi-exclamation-triangle me-2"></i><%= error === 'Nomor HP tidak valid atau belum terdaftar.' ? 'ID/Tag tidak valid atau belum terdaftar.' : error %>
 		</div>
 		<% } %>
         <div class="text-center footer-text">
