@@ -378,6 +378,44 @@ router.post('/reboot', async (req, res) => {
   res.render('dashboard', { customer: data || { phone, ssid: '-', status: '-', lastChange: '-' }, connectedUsers: data ? data.connectedUsers : [], notif });
 });
 
+// POST: Ubah ID/Tag pelanggan
+router.post('/change-tag', async (req, res) => {
+  const oldTag = req.session && req.session.phone;
+  const newTag = (req.body.newTag || '').trim();
+  if (!oldTag) return res.redirect('/customer/login');
+  if (!newTag || newTag === oldTag) {
+    const data = await getCustomerDeviceData(oldTag);
+    return res.render('dashboard', { customer: data || { phone: oldTag, ssid: '-', status: '-', lastChange: '-' }, connectedUsers: data ? data.connectedUsers : [], notif: 'ID/Tag baru tidak boleh kosong atau sama dengan yang lama.' });
+  }
+  const device = await findDeviceByTag(oldTag);
+  let notif = '';
+  if (device && device._id) {
+    const settings = getSettingsWithCache();
+    const genieacsUrl = settings.genieacs_url || 'http://localhost:7557';
+    const username = settings.genieacs_username || '';
+    const password = settings.genieacs_password || '';
+    try {
+      // Update tag: hapus tag lama, tambah tag baru
+      const tags = Array.isArray(device.Tags) ? device.Tags.filter(t => t !== oldTag) : [];
+      tags.push(newTag);
+      // PUT hanya _id dan Tags
+      await axios.put(
+        `${genieacsUrl}/devices/${encodeURIComponent(device._id)}`,
+        { _id: device._id, Tags: tags },
+        { auth: { username, password } }
+      );
+      req.session.phone = newTag; // Update session ke tag baru HANYA jika berhasil
+      notif = 'ID/Tag berhasil diubah.';
+    } catch (e) {
+      notif = 'Gagal mengubah ID/Tag pelanggan.';
+    }
+  } else {
+    notif = 'Perangkat tidak ditemukan.';
+  }
+  const data = await getCustomerDeviceData(notif === 'ID/Tag berhasil diubah.' ? newTag : oldTag);
+  res.render('dashboard', { customer: data || { phone: notif === 'ID/Tag berhasil diubah.' ? newTag : oldTag, ssid: '-', status: '-', lastChange: '-' }, connectedUsers: data ? data.connectedUsers : [], notif });
+});
+
 // POST: Logout pelanggan (letakkan sebelum module.exports)
 router.post('/logout', (req, res) => {
   req.session.destroy(() => {
