@@ -246,7 +246,11 @@ async function updatePassword(phone, newPassword) {
 
 // GET: Login page
 router.get('/login', (req, res) => {
-  res.render('login', { error: null });
+  const settings = getSettingsWithCache();
+  res.render('login', { 
+    error: null,
+    settings: settings
+  });
 });
 
 // POST: Proses login
