@@ -13,7 +13,7 @@ Aplikasi ini adalah portal web sederhana untuk pelanggan ISP yang terintegrasi d
 ---
 
 ## Requirement
-- Node.js v14, v16, atau lebih baru
+- Node.js v18, v20, atau lebih baru
 - GenieACS sudah berjalan dan dapat diakses dari aplikasi ini
 
 ---
