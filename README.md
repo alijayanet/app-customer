@@ -20,6 +20,9 @@ Aplikasi ini adalah portal web sederhana untuk pelanggan ISP yang terintegrasi d
 
 ## Instalasi
 1. **Clone repository**
+```
+ git clone https://github.com/alijayanet/app-customer.git
+```
 2. **Install dependensi**
    ```sh
    npm install
