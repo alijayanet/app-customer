@@ -247,6 +247,29 @@ function splitWaChunks(text, maxLen = 3500) {
   return chunks;
 }
 
+/** Kirim notifikasi ke pelanggan saat admin mengubah SSID/Password */
+async function notifyCustomer(sock, lidStore, tag, message) {
+  try {
+    // Cari JID pelanggan berdasarkan tag
+    const customerJid = lidStore.getByTag(tag);
+    if (customerJid) {
+      await sock.sendMessage(customerJid, { text: message });
+      return true;
+    }
+    // Jika tidak ditemukan di lidStore, coba kirim ke nomor tag langsung
+    const phoneNumber = tag.replace(/\D/g, '');
+    if (phoneNumber.length >= 10) {
+      const directJid = `${phoneNumber}@s.whatsapp.net`;
+      await sock.sendMessage(directJid, { text: message });
+      return true;
+    }
+    return false;
+  } catch (e) {
+    logger.error('Gagal mengirim notifikasi ke pelanggan:', e.message || e);
+    return false;
+  }
+}
+
 const MENU_TEXT =
   `📱 *MENU PELANGGAN*
 ${'─'.repeat(30)}
@@ -412,9 +435,24 @@ export async function startWhatsAppBot() {
               continue;
             }
             const ok = await customerDevice.updateSSID(targetTag, parsed.rest);
-            await reply(
-              ok ? `✅ SSID untuk *${targetTag}* berhasil diubah menjadi:\n\n📶 *${parsed.rest}*` : '❌ Gagal mengubah SSID.'
-            );
+            if (ok) {
+              await reply(`✅ SSID untuk *${targetTag}* berhasil diubah menjadi:\n\n📶 *${parsed.rest}*`);
+              // Kirim notifikasi ke pelanggan
+              const companyHeader = getSetting('company_header', 'ALIJAYA WEBPORTAL');
+              const notifMsg = `📢 *NOTIFIKASI PERUBAHAN WIFI*\n\n` +
+                `Yth. Pelanggan ${companyHeader},\n\n` +
+                `SSID WiFi Anda telah diubah oleh admin menjadi:\n\n` +
+                `📶 *${parsed.rest}*\n\n` +
+                `Silakan hubungi admin jika Anda memiliki pertanyaan.`;
+              const notifSent = await notifyCustomer(sock, lidStore, targetTag, notifMsg);
+              if (notifSent) {
+                await reply(`📤 Notifikasi terkirim ke pelanggan *${targetTag}*`);
+              } else {
+                await reply(`⚠️ Tidak dapat mengirim notifikasi ke pelanggan *${targetTag}* (nomor belum terdaftar)`);
+              }
+            } else {
+              await reply('❌ Gagal mengubah SSID.');
+            }
             continue;
           }
           if (parsed.cmd === 'gantisandi') {
@@ -423,7 +461,25 @@ export async function startWhatsAppBot() {
               continue;
             }
             const ok = await customerDevice.updatePassword(targetTag, parsed.rest);
-            await reply(ok ? '✅ Password WiFi berhasil diubah.' : '❌ Gagal mengubah password.');
+            if (ok) {
+              await reply('✅ Password WiFi berhasil diubah.');
+              // Kirim notifikasi ke pelanggan
+              const companyHeader = getSetting('company_header', 'ALIJAYA WEBPORTAL');
+              const notifMsg = `📢 *NOTIFIKASI PERUBAHAN PASSWORD*\n\n` +
+                `Yth. Pelanggan ${companyHeader},\n\n` +
+                `Password WiFi Anda telah diubah oleh admin menjadi:\n\n` +
+                `🔑 *${parsed.rest}*\n\n` +
+                `Silakan gunakan password baru untuk terhubung ke WiFi.\n` +
+                `Hubungi admin jika Anda memiliki pertanyaan.`;
+              const notifSent = await notifyCustomer(sock, lidStore, targetTag, notifMsg);
+              if (notifSent) {
+                await reply(`📤 Notifikasi terkirim ke pelanggan *${targetTag}*`);
+              } else {
+                await reply(`⚠️ Tidak dapat mengirim notifikasi ke pelanggan *${targetTag}* (nomor belum terdaftar)`);
+              }
+            } else {
+              await reply('❌ Gagal mengubah password.');
+            }
             continue;
           }
           if (parsed.cmd === 'reboot') {

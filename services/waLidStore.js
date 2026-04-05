@@ -42,6 +42,18 @@ class WaLidStore {
     this.map[jid.toLowerCase()] = String(canonicalTag);
     this._save();
   }
+
+  /** Cari JID berdasarkan tag (reverse lookup) */
+  getByTag(canonicalTag) {
+    if (!canonicalTag) return null;
+    const target = String(canonicalTag).toLowerCase();
+    for (const [jid, tag] of Object.entries(this.map)) {
+      if (String(tag).toLowerCase() === target) {
+        return jid;
+      }
+    }
+    return null;
+  }
 }
 
 module.exports = { WaLidStore };
