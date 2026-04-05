@@ -3,6 +3,7 @@
  */
 const axios = require('axios');
 const { getSettingsWithCache } = require('../config/settingsManager');
+const logger = require('../utils/logger');
 
 async function findDeviceByTag(tag) {
   const settings = getSettingsWithCache();
@@ -266,15 +267,24 @@ async function updateSSID(tag, newSSID) {
 
 async function updatePassword(tag, newPassword) {
   try {
-    if (newPassword.length < 8) return false;
+    if (newPassword.length < 8) {
+      logger.warn(`[updatePassword] Password too short for tag ${tag}`);
+      return false;
+    }
     const device = await findDeviceByTag(tag);
-    if (!device) return false;
+    if (!device) {
+      logger.warn(`[updatePassword] Device not found for tag ${tag}`);
+      return false;
+    }
     const deviceId = encodeURIComponent(device._id);
     const settings = getSettingsWithCache();
     const genieacsUrl = settings.genieacs_url || 'http://localhost:7557';
     const auth = { username: settings.genieacs_username || '', password: settings.genieacs_password || '' };
     const tasksUrl = `${genieacsUrl}/devices/${deviceId}/tasks`;
 
+    logger.info(`[updatePassword] Setting password for device ${deviceId}, tag ${tag}`);
+
+    // Set password 2.4GHz
     await axios.post(tasksUrl, {
       name: 'setParameterValues',
       parameterValues: [
@@ -282,7 +292,9 @@ async function updatePassword(tag, newPassword) {
         ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey.1.KeyPassphrase', newPassword, 'xsd:string']
       ]
     }, { auth });
+    logger.info(`[updatePassword] 2.4GHz password set successfully`);
 
+    // Set password 5GHz (index 5-8)
     for (const idx of [5, 6, 7, 8]) {
       try {
         await axios.post(tasksUrl, {
@@ -292,17 +304,23 @@ async function updatePassword(tag, newPassword) {
             [`InternetGatewayDevice.LANDevice.1.WLANConfiguration.${idx}.PreSharedKey.1.KeyPassphrase`, newPassword, 'xsd:string']
           ]
         }, { auth });
+        logger.info(`[updatePassword] 5GHz password set successfully on WLAN.${idx}`);
         break;
-      } catch (e) {}
+      } catch (e) {
+        logger.debug(`[updatePassword] 5GHz WLAN.${idx} not available or failed: ${e.message}`);
+      }
     }
 
+    // Refresh object
     await axios.post(tasksUrl, {
       name: 'refreshObject',
       objectName: 'InternetGatewayDevice.LANDevice.1.WLANConfiguration'
     }, { auth });
+    logger.info(`[updatePassword] Refresh object sent successfully`);
 
     return true;
   } catch (e) {
+    logger.error(`[updatePassword] Error: ${e.message}`, e.response?.data || '');
     return false;
   }
 }
