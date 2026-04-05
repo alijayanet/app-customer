@@ -331,21 +331,24 @@ async function listDevicesWithTags(limit = 250) {
   const genieacsUrl = settings.genieacs_url || 'http://localhost:7557';
   const auth = { username: settings.genieacs_username || '', password: settings.genieacs_password || '' };
   const queries = [
-    { '_tags.0': { $exists: true } },
-    { _tags: { $exists: true, $not: { $size: 0 } } }
+    { _tags: { $exists: true, $ne: [] } },
+    { _tags: { $exists: true, $not: { $size: 0 } } },
+    { '_tags.0': { $exists: true } }
   ];
   for (const query of queries) {
     try {
       const response = await axios.get(`${genieacsUrl}/devices`, {
         params: {
           query: JSON.stringify(query),
-          projection: '_id,_tags,_lastInform,DeviceID.SerialNumber'
+          projection: '_id,_tags,_lastInform,DeviceID.SerialNumber,InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Username'
         },
         auth,
         timeout: 45000
       });
       const rows = Array.isArray(response.data) ? response.data : [];
-      return { ok: true, devices: rows.slice(0, limit) };
+      if (rows.length > 0) {
+        return { ok: true, devices: rows.slice(0, limit) };
+      }
     } catch (e) {
       /* coba query alternatif */
     }

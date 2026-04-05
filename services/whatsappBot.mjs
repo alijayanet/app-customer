@@ -202,20 +202,29 @@ function formatListOnu(devices) {
   const companyHeader = getSetting('company_header', 'ALIJAYA WEBPORTAL');
   const footerInfo = getSetting('footer_info', 'Internet Tanpa Batas');
   
-  const header = `📱 *DAFTAR ONU BER-TAG*\n${'─'.repeat(30)}\n📊 *${companyHeader}*\n${'─'.repeat(30)}\n`;
-  const footer = `\n${'─'.repeat(30)}\n${footerInfo}`;
+  const header = `📱 *DAFTAR ONU BER-TAG*
+${'─'.repeat(30)}
+📊 *${companyHeader}*
+${'─'.repeat(30)}
+`;
+  const footer = `
+${'─'.repeat(30)}
+${footerInfo}`;
   
   if (!devices || devices.length === 0) {
     return header + `❌ Tidak ada perangkat dengan tag.` + footer;
   }
   
-  const content = `📊 *${devices.length} perangkat ditemukan:*\n`;
+  const content = `📊 *${devices.length} perangkat ditemukan:*
+`;
   const lines = devices.map((d, i) => {
     const num = String(i + 1).padStart(2, '0');
     const tags = Array.isArray(d._tags) ? d._tags.join(', ') : String(d._tags || '-');
-    const sn = d.DeviceID?.SerialNumber || '-';
+    const pppoeUsername = d.InternetGatewayDevice?.WANDevice?.['1']?.WANConnectionDevice?.['1']?.WANPPPConnection?.['1']?.Username?._value || '-';
     const li = d._lastInform ? new Date(d._lastInform).toLocaleString('id-ID') : '-';
-    return `${num}. 🏷️ *${tags}*\n   🔖 SN: ${sn}\n   ⏱️ Last inform: ${li}`;
+    return `${num}. 🏷️ *${tags}*
+   � PPPoE: ${pppoeUsername}
+   ⏱️ Last inform: ${li}`;
   }).join('\n\n');
   
   return header + content + lines + footer;
