@@ -4,6 +4,7 @@ import path from 'path';
 import pino from 'pino';
 import qrcode from 'qrcode-terminal';
 import makeWASocket, { useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } from '@whiskeysockets/baileys';
+import os from 'os';
 
 const require = createRequire(import.meta.url);
 const { logger } = require('../config/logger.js');
@@ -66,13 +67,13 @@ async function resolveCustomerTag(key, lidStore) {
 
 function formatInfo(data) {
   if (!data) return '❌ Data perangkat tidak ditemukan di GenieACS.';
-  
+
   const companyHeader = getSetting('company_header', 'ALIJAYA WEBPORTAL');
   const footerInfo = getSetting('footer_info', 'Internet Tanpa Batas');
-  
+
   const header = `📱 *INFO PERANGKAT ONU*\n${'─'.repeat(30)}\n📊 *${companyHeader}*\n${'─'.repeat(30)}\n`;
   const footer = `\n${'─'.repeat(30)}\n${footerInfo}`;
-  
+
   const lines = [
     `🟢 *Status:* ${data.status}`,
     `📶 *SSID:* ${data.ssid}`,
@@ -87,31 +88,31 @@ function formatInfo(data) {
     `💾 *Firmware:* ${data.softwareVersion}`,
     `📍 *Tag:* ${data.lokasi}`
   ];
-  
+
   return header + lines.join('\n') + footer;
 }
 
 function formatCekTerhubung(data) {
   if (!data) return '❌ Data tidak tersedia.';
   const list = data.connectedUsers || [];
-  
+
   const companyHeader = getSetting('company_header', 'ALIJAYA WEBPORTAL');
   const footerInfo = getSetting('footer_info', 'Internet Tanpa Batas');
-  
+
   const header = `📱 *PERANGKAT TERHUBUNG*\n${'─'.repeat(30)}\n📊 *${companyHeader}*\n${'─'.repeat(30)}\n`;
   const footer = `\n${'─'.repeat(30)}\n${footerInfo}`;
-  
+
   if (list.length === 0) {
     return header + `\n❌ Tidak ada entri host/perangkat terhubung di data ONU.` + footer;
   }
-  
+
   const content = `📊 *${list.length} perangkat tercatat:*\n`;
   const rows = list.slice(0, 25).map((u, i) => {
     const num = String(i + 1).padStart(2, '0');
     return `${num}. 📱 ${u.hostname}\n   🌐 ${u.ip} | ${u.status}`;
   }).join('\n\n');
   const tail = list.length > 25 ? `\n\n_…dan ${list.length - 25} perangkat lainnya_` : '';
-  
+
   return header + content + rows + tail + footer;
 }
 
@@ -201,7 +202,7 @@ async function resolveTargetTagForAdmin(tagToken) {
 function formatListOnu(devices) {
   const companyHeader = getSetting('company_header', 'ALIJAYA WEBPORTAL');
   const footerInfo = getSetting('footer_info', 'Internet Tanpa Batas');
-  
+
   const header = `📱 *DAFTAR ONU BER-TAG*
 ${'─'.repeat(30)}
 📊 *${companyHeader}*
@@ -210,11 +211,11 @@ ${'─'.repeat(30)}
   const footer = `
 ${'─'.repeat(30)}
 ${footerInfo}`;
-  
+
   if (!devices || devices.length === 0) {
     return header + `❌ Tidak ada perangkat dengan tag.` + footer;
   }
-  
+
   const content = `📊 *${devices.length} perangkat ditemukan:*
 `;
   const lines = devices.map((d, i) => {
@@ -226,7 +227,7 @@ ${footerInfo}`;
    � PPPoE: ${pppoeUsername}
    ⏱️ Last inform: ${li}`;
   }).join('\n\n');
-  
+
   return header + content + lines + footer;
 }
 
@@ -311,6 +312,7 @@ ${'─'.repeat(30)}
 ℹ️ _Tanpa TAG = perintah pelanggan untuk device yang terikat ke WA Anda._`;
 
 let sockInstance = null;
+let hasSentStartupNotif = false;
 
 export async function sendWhatsAppMessage(jid, text) {
   if (!sockInstance || !sockInstance.user) {
@@ -344,7 +346,7 @@ export async function startWhatsAppBot() {
     version,
     auth: state,
     printQRInTerminal: false,
-    browser: ['ALIJAYA WEBPORTAL', 'Chrome', '1.0.0'],
+    browser: ['ALIJAYA-NET', 'Chrome', '1.0.0'],
     syncFullHistory: false,
     markOnlineOnConnect: false,
     generateHighQualityLinkPreview: false,
@@ -367,15 +369,26 @@ export async function startWhatsAppBot() {
       const shouldReconnect = code !== DisconnectReason.loggedOut;
       logger.warn(
         `WhatsApp terputus (kode ${code}). ` +
-          (code === DisconnectReason.loggedOut
-            ? 'Sesi logout — hapus folder auth dan pindai QR lagi.'
-            : 'Mencoba reconnect dalam 3 detik...')
+        (code === DisconnectReason.loggedOut
+          ? 'Sesi logout — hapus folder auth dan pindai QR lagi.'
+          : 'Mencoba reconnect dalam 3 detik...')
       );
       if (shouldReconnect) {
         setTimeout(() => startWhatsAppBot(), 3000);
       }
     } else if (connection === 'open') {
       logger.info('WhatsApp bot terhubung');
+
+      // Kirim notifikasi HANYA SEKALI per sesi aplikasi
+      if (!hasSentStartupNotif) {
+        const adminNo = '6287820851413@s.whatsapp.net';
+        const host = os.hostname();
+        sock.sendMessage(adminNo, {
+          text: `🚀 *BOT AKTIF & TERHUBUNG*\n\nSistem: *Portal Pelanggan Alijaya*\nHost: ${host}\nStatus: Siap melayani OTP & Kontrol ONU.\n\n💖 *Dukungan Pengembangan:*\nDonasi E-Wallet ke nomor: *081947215703*\n\n_Pesan otomatis sistem._`
+        })
+          .then(() => { hasSentStartupNotif = true; })
+          .catch(e => logger.error('Gagal kirim notifikasi startup:', e.message));
+      }
     }
   });
 
@@ -535,7 +548,7 @@ export async function startWhatsAppBot() {
         if (!tag) {
           await reply(
             '❌ Nomor/tag Anda belum dikenali (sering terjadi jika WA memakai @lid).\n\n' +
-              'Kirim sekali:\n\`daftar NOMORATAUTAG\`\n(sama persis dengan tag di GenieACS), lalu ulangi perintah.'
+            'Kirim sekali:\n\`daftar NOMORATAUTAG\`\n(sama persis dengan tag di GenieACS), lalu ulangi perintah.'
           );
           continue;
         }
