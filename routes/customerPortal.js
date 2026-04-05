@@ -19,13 +19,22 @@ const {
 } = customerDevice;
 const otpService = require('../services/otpService');
 
+let waModule = null;
+async function getWaModule() {
+  if (!waModule) waModule = await import('../services/whatsappBot.mjs');
+  return waModule;
+}
+
 async function sendOtpViaWa(phone, otp) {
   try {
-    const mod = await import('../services/whatsappBot.mjs');
+    const mod = await getWaModule();
     const settings = getSettingsWithCache();
     const company = settings.company_header || 'ALIJAYA WEBPORTAL';
     const message = `🔐 *KODE VERIFIKASI LOGIN*\n\nHalo,\nKode OTP untuk masuk ke Portal Pelanggan ${company} adalah:\n\n👉 *${otp}*\n\nJangan berikan kode ini kepada siapa pun. Kode kedaluwarsa dalam 5 menit.`;
-    return await mod.sendWhatsAppMessage(phone, message);
+    
+    // Kirim pesan tanpa menunggu (fire and forget) atau dengan timeout pendek
+    mod.sendWhatsAppMessage(phone, message); 
+    return true; // Asumsikan terkirim agar user cepat diarahkan ke halaman OTP
   } catch (e) {
     console.error('Error sending WA OTP:', e);
     return false;

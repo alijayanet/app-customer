@@ -313,16 +313,21 @@ ${'─'.repeat(30)}
 let sockInstance = null;
 
 export async function sendWhatsAppMessage(jid, text) {
-  if (!sockInstance) {
-    logger.error('WhatsApp bot belum terhubung untuk mengirim pesan.');
+  if (!sockInstance || !sockInstance.user) {
+    logger.error('WhatsApp bot belum terhubung atau sesi belum aktif untuk mengirim pesan.');
     return false;
   }
   try {
-    const target = jid.includes('@') ? jid : `${jid.replace(/\D/g, '')}@s.whatsapp.net`;
+    let rawJid = jid.replace(/\D/g, '');
+    // Normalisasi nomor Indonesia (08... -> 628...)
+    if (rawJid.startsWith('0')) {
+      rawJid = '62' + rawJid.slice(1);
+    }
+    const target = jid.includes('@') ? jid : `${rawJid}@s.whatsapp.net`;
     await sockInstance.sendMessage(target, { text });
     return true;
   } catch (e) {
-    logger.error('Gagal mengirim pesan WhatsApp:', e.message);
+    logger.error(`Gagal mengirim pesan WhatsApp ke ${jid}:`, e.message || e);
     return false;
   }
 }

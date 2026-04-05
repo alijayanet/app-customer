@@ -10,7 +10,7 @@ const otpStore = new Map();
  * @returns {string} 
  */
 function generateOtp(phone) {
-  const otp = crypto.randomInt(100000, 999999).toString();
+  const otp = crypto.randomInt(1000, 9999).toString();
   otpStore.set(phone, {
     otp,
     expires: Date.now() + 5 * 60 * 1000 // 5 minutes

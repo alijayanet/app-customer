@@ -84,14 +84,14 @@
       <i class="bi bi-shield-lock"></i>
     </div>
     <h4 class="fw-bold mb-1">Verifikasi OTP</h4>
-    <p class="text-muted small mb-3">Kami telah mengirimkan kode verifikasi 6-digit ke nomor WhatsApp Anda.</p>
+    <p class="text-muted small mb-3">Kami telah mengirimkan kode verifikasi 4-digit ke nomor WhatsApp Anda.</p>
     
     <div class="phone-badge">
       <i class="bi bi-whatsapp me-2"></i><%= phone %>
     </div>
 
     <form method="POST" action="/customer/verify-otp">
-      <input type="text" name="otp" class="form-control form-control-otp" placeholder="••••••" maxlength="6" required autofocus>
+      <input type="text" name="otp" class="form-control form-control-otp" placeholder="••••" maxlength="4" required autofocus>
       
       <% if (error) { %>
         <div class="alert alert-danger py-2 small mb-3">
