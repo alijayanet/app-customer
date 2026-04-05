@@ -310,6 +310,23 @@ ${'─'.repeat(30)}
 
 ℹ️ _Tanpa TAG = perintah pelanggan untuk device yang terikat ke WA Anda._`;
 
+let sockInstance = null;
+
+export async function sendWhatsAppMessage(jid, text) {
+  if (!sockInstance) {
+    logger.error('WhatsApp bot belum terhubung untuk mengirim pesan.');
+    return false;
+  }
+  try {
+    const target = jid.includes('@') ? jid : `${jid.replace(/\D/g, '')}@s.whatsapp.net`;
+    await sockInstance.sendMessage(target, { text });
+    return true;
+  } catch (e) {
+    logger.error('Gagal mengirim pesan WhatsApp:', e.message);
+    return false;
+  }
+}
+
 export async function startWhatsAppBot() {
   const authFolder = path.resolve(projectRoot, getSetting('whatsapp_auth_folder', 'auth_baileys'));
   const lidMapPath = path.resolve(projectRoot, getSetting('whatsapp_lid_map_file', 'data/wa-lid-map.json'));
@@ -329,6 +346,8 @@ export async function startWhatsAppBot() {
     getMessage: true,
     logger: pino({ level: 'silent' })
   });
+
+  sockInstance = sock;
 
   sock.ev.on('creds.update', saveCreds);
 

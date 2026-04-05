@@ -61,15 +61,19 @@ const parameterPaths = {
   ],
   pppUsername: [
     'VirtualParameters.pppoeUsername',
+    'VirtualParameters.pppoeUsername2',
     'VirtualParameters.pppUsername',
     'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Username'
   ],
   uptime: [
     'VirtualParameters.getdeviceuptime',
-    'InternetGatewayDevice.DeviceInfo.UpTime'
+    'InternetGatewayDevice.DeviceInfo.UpTime',
+    'Device.DeviceInfo.UpTime'
   ],
   userConnected: [
-    'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TotalAssociations'
+    'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TotalAssociations',
+    'VirtualParameters.activedevices',
+    'Device.WiFi.SSID.1.Stats.TotalAssociations'
   ]
 };
 
@@ -182,10 +186,10 @@ async function getCustomerDeviceData(tag) {
   }
   const uptime = formatUptime(uptimeRaw);
 
-  const serialNumber = device?.DeviceID?.SerialNumber || device?.InternetGatewayDevice?.DeviceInfo?.SerialNumber?._value || '-';
-  const productClass = device?.DeviceID?.ProductClass || device?.InternetGatewayDevice?.DeviceInfo?.ProductClass?._value || '-';
-  const softwareVersion = device?.InternetGatewayDevice?.DeviceInfo?.SoftwareVersion?._value || '-';
-  const model = device?.InternetGatewayDevice?.DeviceInfo?.ModelName?._value || device?.ModelName || '-';
+  const serialNumber = device?.VirtualParameters?.getSerialNumber?._value || device?.DeviceID?.SerialNumber || device?.InternetGatewayDevice?.DeviceInfo?.SerialNumber?._value || device?.InternetGatewayDevice?.DeviceInfo?.['1']?.SerialNumber?._value || device?.Device?.DeviceInfo?.SerialNumber?._value || '-';
+  const productClass = device?.DeviceID?.ProductClass || device?.InternetGatewayDevice?.DeviceInfo?.ProductClass?._value || device?.InternetGatewayDevice?.DeviceInfo?.['1']?.ProductClass?._value || device?.Device?.DeviceInfo?.ProductClass?._value || device?.Device?.DeviceInfo?.['1']?.ProductClass?._value || '-';
+  const softwareVersion = device?.InternetGatewayDevice?.DeviceInfo?.SoftwareVersion?._value || device?.InternetGatewayDevice?.DeviceInfo?.['1']?.SoftwareVersion?._value || device?.Device?.DeviceInfo?.SoftwareVersion?._value || device?.Device?.DeviceInfo?.['1']?.SoftwareVersion?._value || '-';
+  const model = device?.DeviceID?.ProductClass || device?.VirtualParameters?.getSerialNumber?._value?.split('-')?.[0] || device?.InternetGatewayDevice?.DeviceInfo?.ModelName?._value || device?.InternetGatewayDevice?.DeviceInfo?.['1']?.ModelName?._value || device?.Device?.DeviceInfo?.ModelName?._value || device?.Device?.DeviceInfo?.['1']?.ModelName?._value || device?.InternetGatewayDevice?.DeviceInfo?.ProductClass?._value || device?.Device?.DeviceInfo?.ProductClass?._value || device?.ModelName || '-';
 
   let lokasi = device?._tags || '-';
   if (Array.isArray(lokasi)) lokasi = lokasi.join(', ');

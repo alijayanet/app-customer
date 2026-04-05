@@ -17,6 +17,20 @@ const {
   requestReboot,
   updateCustomerTag
 } = customerDevice;
+const otpService = require('../services/otpService');
+
+async function sendOtpViaWa(phone, otp) {
+  try {
+    const mod = await import('../services/whatsappBot.mjs');
+    const settings = getSettingsWithCache();
+    const company = settings.company_header || 'ALIJAYA WEBPORTAL';
+    const message = `🔐 *KODE VERIFIKASI LOGIN*\n\nHalo,\nKode OTP untuk masuk ke Portal Pelanggan ${company} adalah:\n\n👉 *${otp}*\n\nJangan berikan kode ini kepada siapa pun. Kode kedaluwarsa dalam 5 menit.`;
+    return await mod.sendWhatsAppMessage(phone, message);
+  } catch (e) {
+    console.error('Error sending WA OTP:', e);
+    return false;
+  }
+}
 
 router.get('/login', (req, res) => {
   const settings = getSettingsWithCache();
@@ -26,11 +40,51 @@ router.get('/login', (req, res) => {
 router.post('/login', async (req, res) => {
   const { phone } = req.body;
   const settings = getSettingsWithCache();
+  
   if (!(await findDeviceByTag(phone))) {
     return res.render('login', { error: 'ID/Tag tidak valid atau belum terdaftar.', settings });
   }
+
+  // Jika OTP diaktifkan
+  if (settings.login_otp_enabled) {
+    const otp = otpService.generateOtp(phone);
+    const sent = await sendOtpViaWa(phone, otp);
+    if (!sent) {
+      return res.render('login', { error: 'Gagal mengirim OTP via WhatsApp. Hubungi admin.', settings });
+    }
+    req.session.tempPhone = phone; // Simpan sementara sebelum verifikasi
+    return res.redirect('/customer/verify-otp');
+  }
+
+  // Jika OTP tidak aktif, langsung login
   req.session.phone = phone;
   return res.redirect('/customer/dashboard');
+});
+
+router.get('/verify-otp', (req, res) => {
+  const settings = getSettingsWithCache();
+  if (!req.session.tempPhone) return res.redirect('/customer/login');
+  res.render('verify-otp', { phone: req.session.tempPhone, error: null, settings });
+});
+
+router.post('/verify-otp', async (req, res) => {
+  const phone = req.session.tempPhone;
+  const { otp } = req.body;
+  const settings = getSettingsWithCache();
+
+  if (!phone) return res.redirect('/customer/login');
+
+  if (otpService.verifyOtp(phone, otp)) {
+    req.session.phone = phone;
+    delete req.session.tempPhone;
+    return res.redirect('/customer/dashboard');
+  } else {
+    return res.render('verify-otp', { 
+      phone, 
+      error: 'Kode OTP salah atau sudah kedaluwarsa.', 
+      settings 
+    });
+  }
 });
 
 router.get('/dashboard', async (req, res) => {

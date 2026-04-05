@@ -9,5 +9,8 @@
   "whatsapp_enabled": true,
   "whatsapp_auth_folder": "auth_info_baileys",
   "whatsapp_lid_map_file": "data/wa-lid-map.json",
-  "whatsapp_admin_numbers": ["6281947215703"]
+  "whatsapp_admin_numbers": [
+    "6281947215703"
+  ],
+  "login_otp_enabled": false
 }

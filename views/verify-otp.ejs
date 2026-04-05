@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verifikasi OTP | Portal ISP</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    body {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .otp-card {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+      padding: 40px;
+      max-width: 400px;
+      width: 100%;
+      text-align: center;
+    }
+    .otp-icon {
+      font-size: 50px;
+      color: #667eea;
+      margin-bottom: 20px;
+    }
+    .phone-badge {
+      background: #eef2ff;
+      color: #6366f1;
+      padding: 5px 15px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 25px;
+      display: inline-block;
+    }
+    .form-control-otp {
+      letter-spacing: 15px;
+      font-size: 24px;
+      font-weight: 700;
+      text-align: center;
+      border: 2px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 10px;
+      margin-bottom: 20px;
+    }
+    .form-control-otp:focus {
+      border-color: #667eea;
+      box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    }
+    .btn-verify {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border: none;
+      border-radius: 12px;
+      padding: 12px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+    .btn-verify:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+    }
+    .resend-link {
+      font-size: 13px;
+      color: #718096;
+      margin-top: 20px;
+      display: block;
+      text-decoration: none;
+    }
+    .resend-link:hover {
+      color: #667eea;
+    }
+  </style>
+</head>
+<body>
+  <div class="otp-card">
+    <div class="otp-icon">
+      <i class="bi bi-shield-lock"></i>
+    </div>
+    <h4 class="fw-bold mb-1">Verifikasi OTP</h4>
+    <p class="text-muted small mb-3">Kami telah mengirimkan kode verifikasi 6-digit ke nomor WhatsApp Anda.</p>
+    
+    <div class="phone-badge">
+      <i class="bi bi-whatsapp me-2"></i><%= phone %>
+    </div>
+
+    <form method="POST" action="/customer/verify-otp">
+      <input type="text" name="otp" class="form-control form-control-otp" placeholder="••••••" maxlength="6" required autofocus>
+      
+      <% if (error) { %>
+        <div class="alert alert-danger py-2 small mb-3">
+          <i class="bi bi-exclamation-circle me-1"></i><%= error %>
+        </div>
+      <% } %>
+
+      <button type="submit" class="btn btn-primary btn-verify w-100">
+        Verifikasi & Masuk
+      </button>
+    </form>
+
+    <a href="/customer/login" class="resend-link">
+      <i class="bi bi-arrow-left me-1"></i>Ganti nomor atau kirim ulang
+    </a>
+
+    <div class="mt-4 pt-3 border-top text-muted small">
+      &copy; <%= new Date().getFullYear() %> <%= settings.company_header %>
+    </div>
+  </div>
+</body>
+</html>
