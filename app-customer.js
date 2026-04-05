@@ -1,44 +1,45 @@
 const express = require('express');
 const path = require('path');
-const axios = require('axios');
 require('dotenv').config();
 const { logger } = require('./config/logger');
-const fs = require('fs');
 const session = require('express-session');
 const { getSetting } = require('./config/settingsManager');
 
-// Inisialisasi aplikasi Express minimal (hanya untuk health check)
+// Inisialisasi aplikasi Express
 const app = express();
+
+const isProduction = process.env.NODE_ENV === 'production';
+const cookieSecure = getSetting('cookie_secure', isProduction);
+const trustProxy = getSetting('trust_proxy', false);
+if (trustProxy) {
+  app.set('trust proxy', 1);
+}
 
 // Middleware dasar
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(session({
-  secret: getSetting('session_secret', 'rahasia-portal-pelanggan-default-ganti-ini'), // Bisa diubah di settings.json: "session_secret"
+  secret: getSetting('session_secret', 'rahasia-portal-pelanggan-default-ganti-ini'),
   resave: false,
-  saveUninitialized: true,
-  cookie: { secure: false }
+  saveUninitialized: false,
+  cookie: {
+    secure: Boolean(cookieSecure),
+    httpOnly: true,
+    sameSite: 'lax',
+    maxAge: 24 * 60 * 60 * 1000
+  }
 }));
 
 // Konstanta
 const VERSION = '1.0.0';
 
-// Variabel global untuk menyimpan semua pengaturan dari settings.json
+// Variabel global untuk modul lain yang masih membaca konfigurasi (mis. skrip utilitas)
 global.appSettings = {
-  // Server
   port: getSetting('server_port', 4555),
   host: getSetting('server_host', 'localhost'),
-  
-  // Admin
-  adminUsername: getSetting('admin_username', 'admin'),
-  adminPassword: getSetting('admin_password', 'admin'),
-  
-  // GenieACS
   genieacsUrl: getSetting('genieacs_url', 'http://localhost:7557'),
   genieacsUsername: getSetting('genieacs_username', ''),
   genieacsPassword: getSetting('genieacs_password', ''),
-  
-  // Company Info
   companyHeader: getSetting('company_header', 'ISP Monitor'),
   footerInfo: getSetting('footer_info', ''),
 };
@@ -60,9 +61,6 @@ app.get('/', (req, res) => {
 app.get('/login', (req, res) => {
   res.redirect('/customer/login');
 });
-
-// Import GenieACS commands module
-const genieacsCommands = require('./config/genieacs-commands');
 
 // Tambahkan view engine dan static
 app.set('view engine', 'ejs');
@@ -118,8 +116,11 @@ logger.info(`Attempting to start server on configured port: ${port}`);
 // Mulai server dengan port dari konfigurasi
 startServer(port);
 
-// Tambahkan perintah untuk menambahkan nomor pelanggan ke tag GenieACS
-const { addCustomerTag } = require('./config/customerTag');
+if (getSetting('whatsapp_enabled', false)) {
+  import('./services/whatsappBot.mjs')
+    .then((mod) => mod.startWhatsAppBot())
+    .catch((err) => logger.error('Gagal memulai WhatsApp bot:', err));
+}
 
 // Export app untuk testing
 module.exports = app;

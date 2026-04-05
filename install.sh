@@ -108,7 +108,11 @@ cat > "$APP_DIR/settings.json" << EOF
   "footer_info": "Internet Tanpa Batas",
   "server_port": ${CURRENT_PORT},
   "server_host": "localhost",
-  "session_secret": "$(openssl rand -hex 32)"
+  "session_secret": "$(openssl rand -hex 32)",
+  "whatsapp_enabled": true,
+  "whatsapp_auth_folder": "auth_info_baileys",
+  "whatsapp_lid_map_file": "data/wa-lid-map.json",
+  "whatsapp_admin_numbers": []
 }
 EOF
 

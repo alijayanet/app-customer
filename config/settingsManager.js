@@ -26,7 +26,6 @@ function getSettingsWithCache() {
   if (!settingsCache || (now - settingsCacheTime) > CACHE_DURATION) {
     settingsCache = getSettings();
     settingsCacheTime = now;
-    console.log('🔄 Settings reloaded from file');
   }
   return settingsCache;
 }
@@ -57,27 +56,26 @@ function startSettingsWatcher() {
     
     // Buat watcher baru
     watcher = fs.watch(settingsPath, (eventType, filename) => {
-      if (eventType === 'change' && filename === 'settings.json') {
-        console.log('📝 Settings file changed, clearing cache...');
-        // Clear cache agar settings baru terbaca
-        settingsCache = null;
-        settingsCacheTime = 0;
-        
-        // Reload settings
-        try {
-          const newSettings = getSettingsWithCache();
-          console.log('✅ Settings auto-reloaded successfully');
-          console.log('📊 Current settings summary:');
-          console.log(`   - OTP Length: ${newSettings.otp_length || 6}`);
-          console.log(`   - RX Power Notification: ${newSettings.rx_power_notification_enable ? 'ON' : 'OFF'}`);
-          console.log(`   - Server Port: ${newSettings.server_port || 4555}`);
-        } catch (error) {
-          console.error('❌ Error auto-reloading settings:', error.message);
-        }
+      if (eventType !== 'change') return;
+      // Di Windows `filename` sering null; hanya abaikan jika jelas bukan settings.json
+      if (filename != null && filename !== 'settings.json') return;
+
+      settingsCache = null;
+      settingsCacheTime = 0;
+
+      try {
+        const s = getSettingsWithCache();
+        const port = s.server_port ?? 4555;
+        const host = s.server_host || 'localhost';
+        const gurl = s.genieacs_url || '(tidak diatur)';
+        const company = s.company_header || '(default)';
+        console.log('[settings] settings.json dimuat ulang —', `port ${port}, host ${host}, company: ${company}, GenieACS: ${gurl}`);
+      } catch (error) {
+        console.error('[settings] Gagal memuat ulang settings.json:', error.message);
       }
     });
-    
-    console.log('👁️ Settings file watcher started');
+
+    console.log('[settings] Memantau perubahan settings.json');
   } catch (error) {
     console.error('❌ Error starting settings watcher:', error.message);
   }

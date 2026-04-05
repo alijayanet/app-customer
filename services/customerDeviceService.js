@@ -1,0 +1,389 @@
+/**
+ * Logika GenieACS yang dipakai portal web dan bot WhatsApp.
+ */
+const axios = require('axios');
+const { getSettingsWithCache } = require('../config/settingsManager');
+
+async function findDeviceByTag(tag) {
+  const settings = getSettingsWithCache();
+  const genieacsUrl = settings.genieacs_url || 'http://localhost:7557';
+  const username = settings.genieacs_username || '';
+  const password = settings.genieacs_password || '';
+  try {
+    const response = await axios.get(`${genieacsUrl}/devices`, {
+      params: {
+        query: JSON.stringify({ _tags: tag }),
+        projection: '_id,_tags'
+      },
+      auth: { username, password },
+      timeout: 10000
+    });
+    if (response.data && response.data.length > 0) {
+      return response.data[0];
+    }
+    return null;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function fetchFullDevice(tag) {
+  const settings = getSettingsWithCache();
+  const genieacsUrl = settings.genieacs_url || 'http://localhost:7557';
+  const username = settings.genieacs_username || '';
+  const password = settings.genieacs_password || '';
+  try {
+    const response = await axios.get(`${genieacsUrl}/devices`, {
+      params: { query: JSON.stringify({ _tags: tag }) },
+      auth: { username, password },
+      timeout: 15000
+    });
+    if (response.data && response.data.length > 0) {
+      return response.data[0];
+    }
+    return null;
+  } catch (e) {
+    return null;
+  }
+}
+
+const parameterPaths = {
+  rxPower: [
+    'VirtualParameters.RXPower',
+    'VirtualParameters.redaman',
+    'InternetGatewayDevice.WANDevice.1.WANPONInterfaceConfig.RXPower'
+  ],
+  pppoeIP: [
+    'VirtualParameters.pppoeIP',
+    'VirtualParameters.pppIP',
+    'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.ExternalIPAddress'
+  ],
+  pppUsername: [
+    'VirtualParameters.pppoeUsername',
+    'VirtualParameters.pppUsername',
+    'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Username'
+  ],
+  uptime: [
+    'VirtualParameters.getdeviceuptime',
+    'InternetGatewayDevice.DeviceInfo.UpTime'
+  ],
+  userConnected: [
+    'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TotalAssociations'
+  ]
+};
+
+function getParameterWithPaths(device, paths) {
+  for (const p of paths) {
+    const parts = p.split('.');
+    let value = device;
+    for (const part of parts) {
+      if (value && typeof value === 'object' && part in value) {
+        value = value[part];
+        if (value && value._value !== undefined) value = value._value;
+      } else {
+        value = undefined;
+        break;
+      }
+    }
+    if (value !== undefined && value !== null && value !== '') return value;
+  }
+  return 'N/A';
+}
+
+function expandTagCandidates(input) {
+  const t = String(input || '').trim();
+  if (!t) return [];
+  if (/^\d+$/.test(t)) {
+    const d = t.replace(/\D/g, '');
+    const set = new Set([d]);
+    if (d.startsWith('62') && d.length > 2) set.add('0' + d.slice(2));
+    if (d.startsWith('0')) set.add('62' + d.slice(1));
+    return [...set];
+  }
+  return [t];
+}
+
+/** Coba beberapa varian tag (62/0 untuk nomor) sampai device ketemu */
+async function findDeviceWithTagVariants(input) {
+  for (const c of expandTagCandidates(input)) {
+    const dev = await findDeviceByTag(c);
+    if (dev) return { device: dev, canonicalTag: c };
+  }
+  return null;
+}
+
+/** Nomor dari JID WhatsApp @s.whatsapp.net */
+function phoneFromPnJid(jid) {
+  if (!jid || typeof jid !== 'string') return null;
+  const [user, host] = jid.split('@');
+  if (!user || host !== 's.whatsapp.net') return null;
+  return user.replace(/\D/g, '') || null;
+}
+
+async function getCustomerDeviceData(tag) {
+  const device = await fetchFullDevice(tag);
+  if (!device) return null;
+
+  const ssid = device?.InternetGatewayDevice?.LANDevice?.['1']?.WLANConfiguration?.['1']?.SSID?._value || '-';
+
+  const lastInform =
+    device?._lastInform
+      ? new Date(device._lastInform).toLocaleString('id-ID')
+      : device?.Events?.Inform
+        ? new Date(device.Events.Inform).toLocaleString('id-ID')
+        : device?.InternetGatewayDevice?.DeviceInfo?.['1']?.LastInform?._value
+          ? new Date(device.InternetGatewayDevice.DeviceInfo['1'].LastInform._value).toLocaleString('id-ID')
+          : '-';
+
+  let status = 'Unknown';
+  if (device?._lastInform) {
+    const diffMs = Date.now() - new Date(device._lastInform).getTime();
+    status = diffMs < 15 * 60 * 1000 ? 'Online' : 'Offline';
+  } else if (device?.Events?.Inform) {
+    const diffMs = Date.now() - new Date(device.Events.Inform).getTime();
+    status = diffMs < 15 * 60 * 1000 ? 'Online' : 'Offline';
+  }
+
+  let connectedUsers = [];
+  try {
+    const hosts = device?.InternetGatewayDevice?.LANDevice?.['1']?.Hosts?.Host;
+    if (hosts && typeof hosts === 'object') {
+      for (const key in hosts) {
+        if (!isNaN(key)) {
+          const entry = hosts[key];
+          connectedUsers.push({
+            hostname: typeof entry?.HostName === 'object' ? entry?.HostName?._value || '-' : entry?.HostName || '-',
+            ip: typeof entry?.IPAddress === 'object' ? entry?.IPAddress?._value || '-' : entry?.IPAddress || '-',
+            mac: typeof entry?.MACAddress === 'object' ? entry?.MACAddress?._value || '-' : entry?.MACAddress || '-',
+            iface: typeof entry?.InterfaceType === 'object' ? entry?.InterfaceType?._value || '-' : entry?.InterfaceType || entry?.Interface || '-',
+            status: entry?.Active?._value === 'true' ? 'Online' : 'Offline'
+          });
+        }
+      }
+    }
+  } catch (e) {}
+
+  const rxPower = getParameterWithPaths(device, parameterPaths.rxPower);
+  const pppoeIP = getParameterWithPaths(device, parameterPaths.pppoeIP);
+  const pppoeUsername = getParameterWithPaths(device, parameterPaths.pppUsername);
+  const uptimeRaw = getParameterWithPaths(device, parameterPaths.uptime);
+  const totalAssociations = getParameterWithPaths(device, parameterPaths.userConnected);
+
+  function formatUptime(seconds) {
+    if (!seconds || isNaN(seconds) || seconds === 'N/A') return seconds || 'N/A';
+    const s = parseInt(seconds, 10);
+    const d = Math.floor(s / 86400);
+    const h = Math.floor((s % 86400) / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    if (d > 0) return `${d} hari ${h} jam ${m} menit`;
+    if (h > 0) return `${h} jam ${m} menit`;
+    return `${m} menit`;
+  }
+  const uptime = formatUptime(uptimeRaw);
+
+  const serialNumber = device?.DeviceID?.SerialNumber || device?.InternetGatewayDevice?.DeviceInfo?.SerialNumber?._value || '-';
+  const productClass = device?.DeviceID?.ProductClass || device?.InternetGatewayDevice?.DeviceInfo?.ProductClass?._value || '-';
+  const softwareVersion = device?.InternetGatewayDevice?.DeviceInfo?.SoftwareVersion?._value || '-';
+  const model = device?.InternetGatewayDevice?.DeviceInfo?.ModelName?._value || device?.ModelName || '-';
+
+  let lokasi = device?._tags || '-';
+  if (Array.isArray(lokasi)) lokasi = lokasi.join(', ');
+
+  return {
+    phone: tag,
+    ssid,
+    status,
+    lastInform,
+    connectedUsers,
+    rxPower,
+    pppoeIP,
+    pppoeUsername,
+    serialNumber,
+    productClass,
+    lokasi,
+    softwareVersion,
+    model,
+    uptime,
+    totalAssociations
+  };
+}
+
+function fallbackCustomer(tag) {
+  return {
+    phone: tag,
+    ssid: '-',
+    status: 'Tidak ditemukan',
+    lastInform: '-',
+    connectedUsers: [],
+    rxPower: '-',
+    pppoeIP: '-',
+    pppoeUsername: '-',
+    serialNumber: '-',
+    productClass: '-',
+    lokasi: '-',
+    softwareVersion: '-',
+    model: '-',
+    uptime: '-',
+    totalAssociations: '-'
+  };
+}
+
+async function updateSSID(tag, newSSID) {
+  try {
+    const device = await findDeviceByTag(tag);
+    if (!device) return false;
+    const deviceId = encodeURIComponent(device._id);
+    const settings = getSettingsWithCache();
+    const genieacsUrl = settings.genieacs_url || 'http://localhost:7557';
+    const auth = { username: settings.genieacs_username || '', password: settings.genieacs_password || '' };
+
+    await axios.post(`${genieacsUrl}/devices/${deviceId}/tasks`, {
+      name: 'setParameterValues',
+      parameterValues: [['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID', newSSID, 'xsd:string']]
+    }, { auth });
+
+    const newSSID5G = `${newSSID}-5G`;
+    for (const idx of [5, 6, 7, 8]) {
+      try {
+        await axios.post(`${genieacsUrl}/devices/${deviceId}/tasks`, {
+          name: 'setParameterValues',
+          parameterValues: [[`InternetGatewayDevice.LANDevice.1.WLANConfiguration.${idx}.SSID`, newSSID5G, 'xsd:string']]
+        }, { auth });
+        break;
+      } catch (e) {}
+    }
+
+    await axios.post(`${genieacsUrl}/devices/${deviceId}/tasks`, {
+      name: 'refreshObject',
+      objectName: 'InternetGatewayDevice.LANDevice.1.WLANConfiguration'
+    }, { auth });
+
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+async function updatePassword(tag, newPassword) {
+  try {
+    if (newPassword.length < 8) return false;
+    const device = await findDeviceByTag(tag);
+    if (!device) return false;
+    const deviceId = encodeURIComponent(device._id);
+    const settings = getSettingsWithCache();
+    const genieacsUrl = settings.genieacs_url || 'http://localhost:7557';
+    const auth = { username: settings.genieacs_username || '', password: settings.genieacs_password || '' };
+    const tasksUrl = `${genieacsUrl}/devices/${deviceId}/tasks`;
+
+    await axios.post(tasksUrl, {
+      name: 'setParameterValues',
+      parameterValues: [
+        ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.KeyPassphrase', newPassword, 'xsd:string'],
+        ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey.1.KeyPassphrase', newPassword, 'xsd:string']
+      ]
+    }, { auth });
+
+    for (const idx of [5, 6, 7, 8]) {
+      try {
+        await axios.post(tasksUrl, {
+          name: 'setParameterValues',
+          parameterValues: [
+            [`InternetGatewayDevice.LANDevice.1.WLANConfiguration.${idx}.KeyPassphrase`, newPassword, 'xsd:string'],
+            [`InternetGatewayDevice.LANDevice.1.WLANConfiguration.${idx}.PreSharedKey.1.KeyPassphrase`, newPassword, 'xsd:string']
+          ]
+        }, { auth });
+        break;
+      } catch (e) {}
+    }
+
+    await axios.post(tasksUrl, {
+      name: 'refreshObject',
+      objectName: 'InternetGatewayDevice.LANDevice.1.WLANConfiguration'
+    }, { auth });
+
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+async function requestReboot(tag) {
+  const device = await findDeviceByTag(tag);
+  if (!device || !device._id) return { ok: false, message: 'Perangkat tidak ditemukan.' };
+  const settings = getSettingsWithCache();
+  const genieacsUrl = settings.genieacs_url || 'http://localhost:7557';
+  const auth = { username: settings.genieacs_username || '', password: settings.genieacs_password || '' };
+  try {
+    await axios.post(
+      `${genieacsUrl}/devices/${encodeURIComponent(device._id)}/tasks`,
+      { name: 'reboot', timestamp: new Date().toISOString() },
+      { auth }
+    );
+    return { ok: true, message: 'Perintah reboot terkirim. Tunggu beberapa menit hingga ONU online.' };
+  } catch (e) {
+    return { ok: false, message: 'Gagal mengirim reboot ke GenieACS.' };
+  }
+}
+
+/** Daftar perangkat yang punya minimal satu tag (untuk admin WA). */
+async function listDevicesWithTags(limit = 250) {
+  const settings = getSettingsWithCache();
+  const genieacsUrl = settings.genieacs_url || 'http://localhost:7557';
+  const auth = { username: settings.genieacs_username || '', password: settings.genieacs_password || '' };
+  const queries = [
+    { '_tags.0': { $exists: true } },
+    { _tags: { $exists: true, $not: { $size: 0 } } }
+  ];
+  for (const query of queries) {
+    try {
+      const response = await axios.get(`${genieacsUrl}/devices`, {
+        params: {
+          query: JSON.stringify(query),
+          projection: '_id,_tags,_lastInform,DeviceID.SerialNumber'
+        },
+        auth,
+        timeout: 45000
+      });
+      const rows = Array.isArray(response.data) ? response.data : [];
+      return { ok: true, devices: rows.slice(0, limit) };
+    } catch (e) {
+      /* coba query alternatif */
+    }
+  }
+  return { ok: false, devices: [], message: 'Gagal mengambil daftar dari GenieACS.' };
+}
+
+async function updateCustomerTag(oldTag, newTag) {
+  const device = await findDeviceByTag(oldTag);
+  if (!device || !device._id) return { ok: false, message: 'Perangkat tidak ditemukan.' };
+  const settings = getSettingsWithCache();
+  const genieacsUrl = settings.genieacs_url || 'http://localhost:7557';
+  const auth = { username: settings.genieacs_username || '', password: settings.genieacs_password || '' };
+  try {
+    const tags = Array.isArray(device._tags) ? device._tags.filter((t) => t !== oldTag) : [];
+    tags.push(newTag);
+    await axios.put(
+      `${genieacsUrl}/devices/${encodeURIComponent(device._id)}`,
+      { _id: device._id, _tags: tags },
+      { auth }
+    );
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, message: 'Gagal mengubah tag.' };
+  }
+}
+
+module.exports = {
+  findDeviceByTag,
+  fetchFullDevice,
+  getCustomerDeviceData,
+  fallbackCustomer,
+  updateSSID,
+  updatePassword,
+  requestReboot,
+  updateCustomerTag,
+  listDevicesWithTags,
+  expandTagCandidates,
+  findDeviceWithTagVariants,
+  phoneFromPnJid
+};

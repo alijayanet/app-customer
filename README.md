@@ -26,6 +26,12 @@ Portal pelanggan modern dan responsif untuk ISP yang menggunakan **GenieACS**. M
 - 🔄 **Remote Management**:
   - Reboot perangkat langsung dari dashboard.
   - Manajemen Tag/ID Pelanggan mandiri.
+- 📱 **WhatsApp Bot**:
+  - Manajemen perangkat melalui WhatsApp.
+  - Perintah pelanggan: `info`, `cekterhubung`, `gantissid`, `gantisandi`, `reboot`.
+  - Perintah admin: `listonu`, `info [TAG]`, `cekterhubung [TAG]`, dll.
+  - Auto-reconnect untuk stabilitas koneksi.
+  - Format pesan profesional dengan icon dan branding.
 - 📱 **Mobile Friendly**: UI responsif menggunakan Bootstrap 5 dengan desain modern dan *glassmorphism*.
 - 🛠️ **Automated Deployment**: Dilengkapi dengan script installer untuk Ubuntu & Armbian.
 
@@ -37,6 +43,7 @@ Portal pelanggan modern dan responsif untuk ISP yang menggunakan **GenieACS**. M
 - **Templates**: EJS (Embedded JavaScript)
 - **Styling**: Vanilla CSS, Bootstrap 5, Bootstrap Icons
 - **Integrasi**: GenieACS REST API (v1.2+)
+- **WhatsApp Bot**: @whiskeysockets/baileys (v6.7.21)
 - **Process Manager**: PM2
 
 ---
@@ -84,10 +91,45 @@ Jika GenieACS berada di server yang berbeda, Anda dapat mengedit file `settings.
   "company_header": "Alijaya Net",
   "footer_info": "Internet Tanpa Batas",
   "server_port": 3001,
-  "server_host": "localhost"
+  "server_host": "localhost",
+  "whatsapp_enabled": true,
+  "whatsapp_auth_folder": "auth_info_baileys",
+  "whatsapp_lid_map_file": "data/wa-lid-map.json",
+  "whatsapp_admin_numbers": ["6281234567890"]
 }
 ```
 *Jangan lupa restart aplikasi setelah mengedit config:* `pm2 restart app-customer`
+
+### Konfigurasi WhatsApp Bot
+
+| Setting | Deskripsi |
+|---------|-----------|
+| `whatsapp_enabled` | Enable/disable WhatsApp bot (true/false) |
+| `whatsapp_auth_folder` | Folder untuk menyimpan sesi WhatsApp (default: `auth_info_baileys`) |
+| `whatsapp_lid_map_file` | File untuk menyimpan mapping LID ke tag pelanggan |
+| `whatsapp_admin_numbers` | Array nomor WhatsApp admin yang bisa menggunakan perintah admin |
+
+### Cara Menggunakan WhatsApp Bot
+
+1. **Scan QR Code**: Saat pertama kali aplikasi berjalan, QR code akan muncul di terminal. Scan dengan WhatsApp Anda.
+2. **Login Pelanggan**: Jika nomor WA Anda menggunakan @lid, ketik `daftar NOMOR_TAG` untuk mendaftarkan nomor Anda.
+3. **Perintah Pelanggan**:
+   - `menu` - Tampilkan bantuan
+   - `info` - Lihat info ONU Anda
+   - `cekterhubung` - Lihat perangkat yang terhubung
+   - `gantissid NamaWiFi` - Ubah nama WiFi
+   - `gantisandi PasswordBaru` - Ubah password (min 8 karakter)
+   - `reboot` - Restart ONU
+4. **Perintah Admin** (hanya untuk nomor di `whatsapp_admin_numbers`):
+   - `adminmenu` - Tampilkan menu admin
+   - `listonu` - Lihat semua ONU dengan tag
+   - `info TAG` - Lihat info ONU untuk tag tertentu
+   - `cekterhubung TAG` - Lihat perangkat terhubung untuk tag tertentu
+   - `gantissid TAG NamaSSID` - Ubah SSID untuk tag tertentu
+   - `gantisandi TAG PasswordBaru` - Ubah password untuk tag tertentu
+   - `reboot TAG` - Restart ONU untuk tag tertentu
+
+> **Catatan**: Jika koneksi WhatsApp terputus, bot akan otomatis reconnect dalam 3 detik (kecuali jika logout/manual disconnect).
 
 ---
 
