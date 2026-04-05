@@ -3,7 +3,7 @@
  */
 const axios = require('axios');
 const { getSettingsWithCache } = require('../config/settingsManager');
-const logger = require('../utils/logger');
+const logger = require('../config/logger');
 
 async function findDeviceByTag(tag) {
   const settings = getSettingsWithCache();
