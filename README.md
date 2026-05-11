@@ -60,18 +60,14 @@ Pastikan Anda memiliki akses `root` atau `sudo`.
 git clone https://github.com/alijayanet/app-customer.git
 cd app-customer
 
-# Beri izin eksekusi pada script installer
-chmod +x install.sh
+# Install depedensi dulu
+npm install
 ```
 
-### 2. Jalankan Installer
+### 2. Jalankan aplikasi tanpa pm2
 ```bash
-sudo bash install.sh
+npm start
 ```
-
-- Script akan menanyakan apakah Anda ingin menginstall Node.js (v18).
-- Script akan menanyakan apakah Anda ingin menginstall PM2.
-- File `settings.json` akan dibuat otomatis dengan target GenieACS ke `localhost:7557`.
 
 ### 3. Selesai
 Setelah instalasi berhasil, portal dapat diakses di:
